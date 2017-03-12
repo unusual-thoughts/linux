@@ -122,9 +122,6 @@ static void dwc2_sof_intr(struct dwc2_hsotg *hsotg)
 	struct dwc2_qh *qh;
 	enum dwc2_transaction_type tr_type;
 
-	/* Clear interrupt */
-	dwc2_writel(GINTSTS_SOF, hsotg->regs + GINTSTS);
-
 #ifdef DEBUG_SOF
 	dev_vdbg(hsotg->dev, "--Start of Frame Interrupt--\n");
 #endif
@@ -149,6 +146,9 @@ static void dwc2_sof_intr(struct dwc2_hsotg *hsotg)
 	tr_type = dwc2_hcd_select_transactions(hsotg);
 	if (tr_type != DWC2_TRANSACTION_NONE)
 		dwc2_hcd_queue_transactions(hsotg, tr_type);
+
+	/* Clear interrupt */
+	dwc2_writel(GINTSTS_SOF, hsotg->regs + GINTSTS);
 }
 
 /*
@@ -312,7 +312,6 @@ static void dwc2_hprt0_enable(struct dwc2_hsotg *hsotg, u32 hprt0,
 
 	if (do_reset) {
 		*hprt0_modify |= HPRT0_RST;
-		dwc2_writel(*hprt0_modify, hsotg->regs + HPRT0);
 		queue_delayed_work(hsotg->wq_otg, &hsotg->reset_work,
 				   msecs_to_jiffies(60));
 	} else {
@@ -348,12 +347,11 @@ static void dwc2_port_intr(struct dwc2_hsotg *hsotg)
 	 * Set flag and clear if detected
 	 */
 	if (hprt0 & HPRT0_CONNDET) {
-		dwc2_writel(hprt0_modify | HPRT0_CONNDET, hsotg->regs + HPRT0);
-
 		dev_vdbg(hsotg->dev,
 			 "--Port Interrupt HPRT0=0x%08x Port Connect Detected--\n",
 			 hprt0);
 		dwc2_hcd_connect(hsotg);
+		hprt0_modify |= HPRT0_CONNDET;
 
 		/*
 		 * The Hub driver asserts a reset when it sees port connect
@@ -366,10 +364,10 @@ static void dwc2_port_intr(struct dwc2_hsotg *hsotg)
 	 * Clear if detected - Set internal flag if disabled
 	 */
 	if (hprt0 & HPRT0_ENACHG) {
-		dwc2_writel(hprt0_modify | HPRT0_ENACHG, hsotg->regs + HPRT0);
 		dev_vdbg(hsotg->dev,
 			 "  --Port Interrupt HPRT0=0x%08x Port Enable Changed (now %d)--\n",
 			 hprt0, !!(hprt0 & HPRT0_ENA));
+		hprt0_modify |= HPRT0_ENACHG;
 		if (hprt0 & HPRT0_ENA) {
 			hsotg->new_connection = true;
 			dwc2_hprt0_enable(hsotg, hprt0, &hprt0_modify);
@@ -389,13 +387,15 @@ static void dwc2_port_intr(struct dwc2_hsotg *hsotg)
 
 	/* Overcurrent Change Interrupt */
 	if (hprt0 & HPRT0_OVRCURRCHG) {
-		dwc2_writel(hprt0_modify | HPRT0_OVRCURRCHG,
-			    hsotg->regs + HPRT0);
 		dev_vdbg(hsotg->dev,
 			 "  --Port Interrupt HPRT0=0x%08x Port Overcurrent Changed--\n",
 			 hprt0);
 		hsotg->flags.b.port_over_current_change = 1;
+		hprt0_modify |= HPRT0_OVRCURRCHG;
 	}
+
+	/* Clear Port Interrupts */
+	dwc2_writel(hprt0_modify, hsotg->regs + HPRT0);
 }
 
 /*
