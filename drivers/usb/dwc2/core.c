@@ -619,12 +619,6 @@ void dwc2_force_dr_mode(struct dwc2_hsotg *hsotg)
 			 __func__, hsotg->dr_mode);
 		break;
 	}
-
-	/*
-	 * NOTE: This is required for some rockchip soc based
-	 * platforms.
-	 */
-	msleep(50);
 }
 
 /*
