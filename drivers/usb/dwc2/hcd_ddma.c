@@ -1245,10 +1245,8 @@ static void dwc2_complete_non_isoc_xfer_ddma(struct dwc2_hsotg *hsotg,
 		for (i = 0; i < qtd_desc_count; i++) {
 			if (dwc2_process_non_isoc_desc(hsotg, chan, chnum, qtd,
 						       desc_num, halt_status,
-						       &xfer_done)) {
-				qtd = NULL;
+						       &xfer_done))
 				goto stop_scan;
-			}
 
 			desc_num++;
 		}
@@ -1263,7 +1261,7 @@ stop_scan:
 		if (halt_status == DWC2_HC_XFER_STALL)
 			qh->data_toggle = DWC2_HC_PID_DATA0;
 		else
-			dwc2_hcd_save_data_toggle(hsotg, chan, chnum, NULL);
+			dwc2_hcd_save_data_toggle(hsotg, chan, chnum, qtd);
 	}
 
 	if (halt_status == DWC2_HC_XFER_COMPLETE) {
