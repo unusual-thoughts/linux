@@ -2245,10 +2245,10 @@ u32 dwc2_calc_frame_interval(struct dwc2_hsotg *hsotg)
 
 	if ((hprt0 & HPRT0_SPD_MASK) >> HPRT0_SPD_SHIFT == HPRT0_SPD_HIGH_SPEED)
 		/* High speed case */
-		return 125 * clock - 1;
+		return 125 * clock;
 	else
 		/* FS/LS case */
-		return 1000 * clock - 1;
+		return 1000 * clock;
 }
 
 /**
