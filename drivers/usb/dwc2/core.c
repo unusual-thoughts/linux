@@ -463,18 +463,9 @@ static void dwc2_clear_force_mode(struct dwc2_hsotg *hsotg)
  */
 void dwc2_force_dr_mode(struct dwc2_hsotg *hsotg)
 {
-	bool ret;
-
 	switch (hsotg->dr_mode) {
 	case USB_DR_MODE_HOST:
-		ret = dwc2_force_mode(hsotg, true);
-		/*
-		 * NOTE: This is required for some rockchip soc based
-		 * platforms on their host-only dwc2.
-		 */
-		if (!ret)
-			msleep(50);
-
+		dwc2_force_mode(hsotg, true);
 		break;
 	case USB_DR_MODE_PERIPHERAL:
 		dwc2_force_mode(hsotg, false);
