@@ -1174,11 +1174,14 @@ static int dwc2_process_non_isoc_desc(struct dwc2_hsotg *hsotg,
 	failed = dwc2_update_non_isoc_urb_state_ddma(hsotg, chan, qtd, dma_desc,
 						     halt_status, n_bytes,
 						     xfer_done);
-	if (failed || (*xfer_done && urb->status != -EINPROGRESS)) {
+	if (*xfer_done && urb->status != -EINPROGRESS)
+		failed = 1;
+
+	if (failed) {
 		dwc2_host_complete(hsotg, qtd, urb->status);
 		dwc2_hcd_qtd_unlink_and_free(hsotg, qtd, qh);
-		dev_vdbg(hsotg->dev, "failed=%1x xfer_done=%1x\n",
-			 failed, *xfer_done);
+		dev_vdbg(hsotg->dev, "failed=%1x xfer_done=%1x status=%08x\n",
+			 failed, *xfer_done, urb->status);
 		return failed;
 	}
 
@@ -1233,23 +1236,21 @@ static void dwc2_complete_non_isoc_xfer_ddma(struct dwc2_hsotg *hsotg,
 
 	list_for_each_safe(qtd_item, qtd_tmp, &qh->qtd_list) {
 		int i;
-		int qtd_desc_count;
 
 		qtd = list_entry(qtd_item, struct dwc2_qtd, qtd_list_entry);
 		xfer_done = 0;
-		qtd_desc_count = qtd->n_desc;
 
-		for (i = 0; i < qtd_desc_count; i++) {
+		for (i = 0; i < qtd->n_desc; i++) {
 			if (dwc2_process_non_isoc_desc(hsotg, chan, chnum, qtd,
 						       desc_num, halt_status,
-						       &xfer_done))
-				goto stop_scan;
-
+						       &xfer_done)) {
+				qtd = NULL;
+				break;
+			}
 			desc_num++;
 		}
 	}
 
-stop_scan:
 	if (qh->ep_type != USB_ENDPOINT_XFER_CONTROL) {
 		/*
 		 * Resetting the data toggle for bulk and interrupt endpoints
