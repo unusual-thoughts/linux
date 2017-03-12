@@ -81,7 +81,7 @@ static u16 dwc2_max_desc_num(struct dwc2_qh *qh)
 static u16 dwc2_frame_incr_val(struct dwc2_qh *qh)
 {
 	return qh->dev_speed == USB_SPEED_HIGH ?
-	       (qh->host_interval + 8 - 1) / 8 : qh->host_interval;
+	       (qh->interval + 8 - 1) / 8 : qh->interval;
 }
 
 static int dwc2_desc_list_alloc(struct dwc2_hsotg *hsotg, struct dwc2_qh *qh,
@@ -252,7 +252,7 @@ static void dwc2_update_frame_list(struct dwc2_hsotg *hsotg, struct dwc2_qh *qh,
 	chan = qh->channel;
 	inc = dwc2_frame_incr_val(qh);
 	if (qh->ep_type == USB_ENDPOINT_XFER_ISOC)
-		i = dwc2_frame_list_idx(qh->next_active_frame);
+		i = dwc2_frame_list_idx(qh->sched_frame);
 	else
 		i = 0;
 
@@ -278,13 +278,13 @@ static void dwc2_update_frame_list(struct dwc2_hsotg *hsotg, struct dwc2_qh *qh,
 		return;
 
 	chan->schinfo = 0;
-	if (chan->speed == USB_SPEED_HIGH && qh->host_interval) {
+	if (chan->speed == USB_SPEED_HIGH && qh->interval) {
 		j = 1;
 		/* TODO - check this */
-		inc = (8 + qh->host_interval - 1) / qh->host_interval;
+		inc = (8 + qh->interval - 1) / qh->interval;
 		for (i = 0; i < inc; i++) {
 			chan->schinfo |= j;
-			j = j << qh->host_interval;
+			j = j << qh->interval;
 		}
 	} else {
 		chan->schinfo = 0xff;
@@ -431,10 +431,7 @@ static u16 dwc2_calc_starting_frame(struct dwc2_hsotg *hsotg,
 
 	hsotg->frame_number = dwc2_hcd_get_frame_number(hsotg);
 
-	/*
-	 * next_active_frame is always frame number (not uFrame) both in FS
-	 * and HS!
-	 */
+	/* sched_frame is always frame number (not uFrame) both in FS and HS! */
 
 	/*
 	 * skip_frames is used to limit activated descriptors number
@@ -517,13 +514,13 @@ static u16 dwc2_recalc_initial_desc_idx(struct dwc2_hsotg *hsotg,
 		 */
 		fr_idx_tmp = dwc2_frame_list_idx(frame);
 		fr_idx = (FRLISTEN_64_SIZE +
-			  dwc2_frame_list_idx(qh->next_active_frame) -
-			  fr_idx_tmp) % dwc2_frame_incr_val(qh);
+			  dwc2_frame_list_idx(qh->sched_frame) - fr_idx_tmp)
+			 % dwc2_frame_incr_val(qh);
 		fr_idx = (fr_idx + fr_idx_tmp) % FRLISTEN_64_SIZE;
 	} else {
-		qh->next_active_frame = dwc2_calc_starting_frame(hsotg, qh,
+		qh->sched_frame = dwc2_calc_starting_frame(hsotg, qh,
 							   &skip_frames);
-		fr_idx = dwc2_frame_list_idx(qh->next_active_frame);
+		fr_idx = dwc2_frame_list_idx(qh->sched_frame);
 	}
 
 	qh->td_first = qh->td_last = dwc2_frame_to_desc_idx(qh, fr_idx);
@@ -586,7 +583,7 @@ static void dwc2_init_isoc_dma_desc(struct dwc2_hsotg *hsotg,
 	u16 next_idx;
 
 	idx = qh->td_last;
-	inc = qh->host_interval;
+	inc = qh->interval;
 	hsotg->frame_number = dwc2_hcd_get_frame_number(hsotg);
 	cur_idx = dwc2_frame_list_idx(hsotg->frame_number);
 	next_idx = dwc2_desclist_idx_inc(qh->td_last, inc, qh->dev_speed);
@@ -608,11 +605,11 @@ static void dwc2_init_isoc_dma_desc(struct dwc2_hsotg *hsotg,
 		}
 	}
 
-	if (qh->host_interval) {
-		ntd_max = (dwc2_max_desc_num(qh) + qh->host_interval - 1) /
-				qh->host_interval;
+	if (qh->interval) {
+		ntd_max = (dwc2_max_desc_num(qh) + qh->interval - 1) /
+				qh->interval;
 		if (skip_frames && !qh->channel)
-			ntd_max -= skip_frames / qh->host_interval;
+			ntd_max -= skip_frames / qh->interval;
 	}
 
 	max_xfer_size = qh->dev_speed == USB_SPEED_HIGH ?
@@ -1032,7 +1029,7 @@ static void dwc2_complete_isoc_xfer_ddma(struct dwc2_hsotg *hsotg,
 							  idx);
 			if (rc < 0)
 				return;
-			idx = dwc2_desclist_idx_inc(idx, qh->host_interval,
+			idx = dwc2_desclist_idx_inc(idx, qh->interval,
 						    chan->speed);
 			if (!rc)
 				continue;
@@ -1042,7 +1039,7 @@ static void dwc2_complete_isoc_xfer_ddma(struct dwc2_hsotg *hsotg,
 
 			/* rc == DWC2_CMPL_STOP */
 
-			if (qh->host_interval >= 32)
+			if (qh->interval >= 32)
 				goto stop_scan;
 
 			qh->td_first = idx;
